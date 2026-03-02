@@ -18,12 +18,7 @@ export const AuthButton = () => {
   console.log('AuthButton state:', { isPending, isInstalled });
 
   const onClick = useCallback(async () => {
-    if (!isInstalled) {
-      alert('⚠️ This app must be opened inside the World App.\n\nPlease scan the QR code from your World App.');
-      console.warn('MiniKit not detected. Please open this app inside World App.');
-      return;
-    }
-    if (isPending) {
+    if (!isInstalled || isPending) {
       return;
     }
     setIsPending(true);
@@ -57,29 +52,22 @@ export const AuthButton = () => {
   }, [isInstalled]);
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      {!isInstalled && (
-        <div className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-lg max-w-md text-center">
-          ⚠️ Please open this app inside the World App to use wallet features
-        </div>
-      )}
-      <LiveFeedback
-        label={{
-          failed: 'Failed to login',
-          pending: 'Logging in',
-          success: 'Logged in',
-        }}
-        state={isPending ? 'pending' : undefined}
+    <LiveFeedback
+      label={{
+        failed: 'Failed to login',
+        pending: 'Logging in',
+        success: 'Logged in',
+      }}
+      state={isPending ? 'pending' : undefined}
+    >
+      <Button
+        onClick={onClick}
+        disabled={isPending}
+        size="lg"
+        variant="primary"
       >
-        <Button
-          onClick={onClick}
-          disabled={isPending || !isInstalled}
-          size="lg"
-          variant="primary"
-        >
-          {!isInstalled ? 'World App Required' : 'Login with Wallet'}
-        </Button>
-      </LiveFeedback>
-    </div>
+        Login with Wallet
+      </Button>
+    </LiveFeedback>
   );
 };
