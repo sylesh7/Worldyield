@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"World Documentation": {
+			"url": "https://docs.world.org/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}
