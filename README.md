@@ -1,4 +1,4 @@
-# WorldYield
+# WorldYield contracts
 
 | Contract | Address |
 |---|---|
