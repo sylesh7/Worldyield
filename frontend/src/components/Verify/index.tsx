@@ -7,6 +7,8 @@ import { useState } from 'react';
  * This component is an example of how to use World ID in Mini Apps
  * Minikit commands must be used on client components
  * It's critical you verify the proof on the server side
+ * 
+ * Action: 'verayield-entry' - Create this in Developer Portal → Incognito Actions
  * Read More: https://docs.world.org/mini-apps/commands/verify#verifying-the-proof
  */
 export const Verify = () => {
@@ -22,7 +24,7 @@ export const Verify = () => {
     setButtonState('pending');
     setWhichVerification(verificationLevel);
     const result = await MiniKit.commandsAsync.verify({
-      action: 'test-action', // Make sure to create this in the developer portal -> incognito actions
+      action: 'verayield-entry', // Make sure to create this in the developer portal -> incognito actions
       verification_level: verificationLevel,
     });
     console.log(result.finalPayload);
@@ -31,7 +33,7 @@ export const Verify = () => {
       method: 'POST',
       body: JSON.stringify({
         payload: result.finalPayload,
-        action: 'test-action',
+        action: 'verayield-entry',
       }),
     });
 
@@ -52,7 +54,10 @@ export const Verify = () => {
 
   return (
     <div className="grid w-full gap-4">
-      <p className="text-lg font-semibold">Verify</p>
+      <p className="text-lg font-semibold">Verify Human Access</p>
+      <p className="text-sm text-gray-600">
+        Prove you're human to access VeraYield pool
+      </p>
       <LiveFeedback
         label={{
           failed: 'Failed to verify',
