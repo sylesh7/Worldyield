@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { ScrambleTextOnHover } from "@/components/scramble-text"
 import { SplitFlapText, SplitFlapMuteToggle, SplitFlapAudioProvider } from "@/components/split-flap-text"
@@ -23,6 +23,7 @@ gsap.registerPlugin(ScrollTrigger)
 export function HeroSection() {
   const sectionRef = useRef<HTMLElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const [verified, setVerified] = useState(false)
 
   useEffect(() => {
     if (!sectionRef.current || !contentRef.current) return
@@ -66,21 +67,27 @@ export function HeroSection() {
         </SplitFlapAudioProvider>
 
         <h2 className="font-[var(--font-bebas)] text-muted-foreground/60 text-[clamp(1rem,3vw,2rem)] mt-4 tracking-wide">
-          Studies in Controlled Environments
+          Yield for Verified Humans
         </h2>
 
         <p className="mt-12 max-w-md font-mono text-sm text-muted-foreground leading-relaxed">
-          We design systems that behave, not just screens that display. Signals from the edge of what&apos;s shippable.
+          Pool USDC with other World ID verified humans. Our AI agent allocates across the highest-yield DeFi protocols — cross-chain, autonomously, on-chain.
         </p>
 
         <div className="mt-16 flex items-center gap-8">
-          <WorldIDButton />
-          <a
-            href="#signals"
-            className="font-mono text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors duration-200"
-          >
-            Latest Signals
-          </a>
+          <WorldIDButton onVerified={() => setVerified(true)} />
+          {verified ? (
+            <a
+              href="/dashboard"
+              className="font-mono text-xs uppercase tracking-widest border border-accent px-6 py-3 text-accent hover:bg-accent hover:text-background transition-all duration-200"
+            >
+              Get Started
+            </a>
+          ) : (
+            <span className="font-mono text-xs uppercase tracking-widest border border-border/30 px-6 py-3 text-muted-foreground/30 cursor-not-allowed select-none" title="Verify with World ID first">
+              Get Started
+            </span>
+          )}
         </div>
       </div>
 

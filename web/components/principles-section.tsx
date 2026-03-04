@@ -16,37 +16,37 @@ export function PrinciplesSection() {
     {
       number: "01",
       titleParts: [
-        { text: "INTERFACE", highlight: true },
-        { text: " MINIMALISM", highlight: false },
+        { text: "HUMANS", highlight: true },
+        { text: " ONLY", highlight: false },
       ],
-      description: "Reduce until only the essential remains. Every element earns its place.",
+      description: "Every participant is World ID verified. No bots, no whales gaming the pool, no Sybil exploits. One person, one share.",
       align: "left",
     },
     {
       number: "02",
       titleParts: [
-        { text: "SYSTEMS", highlight: true },
-        { text: " OVER SCREENS", highlight: false },
+        { text: "YIELD", highlight: true },
+        { text: " WITHOUT EFFORT", highlight: false },
       ],
-      description: "Design behaviors, not just layouts. Build logic that scales.",
+      description: "Deposit once. The AI agent handles protocol selection, cross-chain routing and rebalancing — you just earn.",
       align: "right",
     },
     {
       number: "03",
       titleParts: [
-        { text: "CONTROLLED ", highlight: false },
-        { text: "TENSION", highlight: true },
+        { text: "FULLY ", highlight: false },
+        { text: "ON-CHAIN", highlight: true },
       ],
-      description: "Balance between restraint and expression. Confidence without excess.",
+      description: "Every decision the agent makes is recorded as an immutable mandate on World Chain. Transparent and auditable by anyone.",
       align: "left",
     },
     {
       number: "04",
       titleParts: [
-        { text: "SIGNAL ", highlight: false },
-        { text: "CLARITY", highlight: true },
+        { text: "GOVERNED BY ", highlight: false },
+        { text: "CONSENSUS", highlight: true },
       ],
-      description: "Communication that cuts through noise. Precision in every interaction.",
+      description: "Protocol upgrades and parameter changes require a quorum of verified humans. Capital controlled by people, not anonymous wallets.",
       align: "right",
     },
   ]
@@ -94,7 +94,7 @@ export function PrinciplesSection() {
       {/* Section header */}
       <div ref={headerRef} className="mb-24">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">03 / Principles</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">HOW WE WORK</h2>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">WHY WORLDYIELD</h2>
       </div>
 
       {/* Staggered principles */}

@@ -9,7 +9,11 @@ const APP_ID = process.env.NEXT_PUBLIC_APP_ID as `app_${string}`
 const ACTION = process.env.NEXT_PUBLIC_WORLD_ACTION || "verayield-entry"
 const ENVIRONMENT = (process.env.NEXT_PUBLIC_WORLD_ENVIRONMENT || "staging") as "staging" | "production"
 
-export function WorldIDButton() {
+interface WorldIDButtonProps {
+  onVerified?: () => void
+}
+
+export function WorldIDButton({ onVerified }: WorldIDButtonProps = {}) {
   const [step, setStep] = useState<"idle" | "loading" | "qr" | "waiting" | "error">("idle")
   const [qrUri, setQrUri] = useState<string | null>(null)
   const [nullifier, setNullifier] = useState<string | null>(null)
@@ -69,6 +73,7 @@ export function WorldIDButton() {
       setNullifier((completion.result as { nullifier_hash?: string }).nullifier_hash ?? signal)
       setStep("idle")
       setQrUri(null)
+      onVerified?.()
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return
       setError(err instanceof Error ? err.message : "Unexpected error")

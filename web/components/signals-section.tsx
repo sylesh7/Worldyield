@@ -9,29 +9,29 @@ gsap.registerPlugin(ScrollTrigger)
 
 const signals = [
   {
-    date: "2025.06.10",
-    title: "Signal Field",
-    note: "New interface paradigm for ambient computing environments.",
+    date: "2026.03.01",
+    title: "Pool Launch",
+    note: "WorldYield goes live on World Chain Sepolia. Verified humans can now deposit USDC and earn cross-chain yield.",
   },
   {
-    date: "2025.05.28",
-    title: "Silent Agent",
-    note: "Orchestration layer for autonomous design systems.",
+    date: "2026.02.20",
+    title: "Agent v1",
+    note: "AI yield optimizer deployed. Mastra-powered agent autonomously rebalances allocations across Aave, Morpho, Compound and Spark.",
   },
   {
-    date: "2025.05.15",
-    title: "Noir Grid",
-    note: "Typographic system for editorial interfaces.",
+    date: "2026.02.10",
+    title: "World ID Gate",
+    note: "Sybil-resistance live. Only World ID verified humans can participate — eliminating bots and duplicate accounts.",
   },
   {
-    date: "2025.04.30",
-    title: "Project Lattice",
-    note: "Structural framework for adaptive layouts.",
+    date: "2026.01.28",
+    title: "Vault v2",
+    note: "VeraYieldVault upgraded with multi-chain routing. Single deposit, multi-protocol yield harvesting across EVM chains.",
   },
   {
-    date: "2025.04.12",
-    title: "Echo Chamber",
-    note: "Audio-visual synthesis in browser environments.",
+    date: "2026.01.10",
+    title: "Consensus Layer",
+    note: "HumanConsensus contract deployed. Governance decisions require a quorum of verified human participants only.",
   },
 ]
 
@@ -135,8 +135,8 @@ export function SignalsSection() {
 
       {/* Section header */}
       <div ref={headerRef} className="mb-16 pr-6 md:pr-12">
-        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Signals</span>
-        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">WHAT&apos;S NEW</h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">01 / Updates</span>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">LATEST SIGNALS</h2>
       </div>
 
       {/* Horizontal scroll container */}
