@@ -14,9 +14,13 @@ import {
 	LATEST_BLOCK_NUMBER,
 	type Runtime,
 } from '@chainlink/cre-sdk'
-import { type Address, decodeFunctionResult, encodeFunctionData, type Hex, zeroAddress } from 'viem'
+import { type Address, decodeFunctionResult, encodeFunctionData, type Hex, zeroAddress, createPublicClient, http } from 'viem'
+import { sepolia, baseSepolia } from 'viem/chains'
 import { MockPool } from './abi/MockPool'
 import { HumanConsensus } from './abi/HumanConsensus'
+
+// Keep these for any remaining CRE workflow usage outside this module
+export type { } // placeholder to avoid unused import warnings
 const SECONDS_PER_YEAR = BigInt(31_536_000)
 const RAY = BigInt(10) ** BigInt(27)
 const WAD = BigInt(10) ** BigInt(18)
@@ -414,9 +418,60 @@ export function scorePoolForVerifiedHumans(
 	}
 }
 
+/** Map CRE chain name → viem public client */
+function getViemClientForChain(chainName: string) {
+	if (chainName.includes('base')) {
+		return createPublicClient({ chain: baseSepolia, transport: http('https://sepolia.base.org') })
+	}
+	// default: ethereum sepolia
+	return createPublicClient({ chain: sepolia, transport: http('https://ethereum-sepolia.publicnode.com') })
+}
+
+/** Read Aave v3 liquidityRate directly via viem */
+async function readAaveAPRRayViem(evmCfg: EVMConfig): Promise<bigint> {
+	const client = getViemClientForChain(evmCfg.chainName)
+	const reserveData = await client.readContract({
+		address: evmCfg.poolAddress as Address,
+		abi: MockPool,
+		functionName: 'getReserveData',
+		args: [evmCfg.assetAddress as Hex],
+	}) as any
+	return reserveData.currentLiquidityRate as bigint
+}
+
+const COMET_ABI = [
+	{ type: 'function', name: 'totalSupply',   inputs: [],                                 outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+	{ type: 'function', name: 'totalBorrow',   inputs: [],                                 outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+	{ type: 'function', name: 'getSupplyRate', inputs: [{ name: 'utilization', type: 'uint256' }], outputs: [{ type: 'uint64' }], stateMutability: 'view' },
+] as const
+
+/** Read Compound v3 supply rate directly via viem */
+async function readCompoundAPRRayViem(evmCfg: EVMConfig): Promise<bigint> {
+	try {
+		const client = getViemClientForChain(evmCfg.chainName)
+		const [totalSupply, totalBorrow] = await Promise.all([
+			client.readContract({ address: evmCfg.poolAddress as Address, abi: COMET_ABI, functionName: 'totalSupply' }) as Promise<bigint>,
+			client.readContract({ address: evmCfg.poolAddress as Address, abi: COMET_ABI, functionName: 'totalBorrow' }) as Promise<bigint>,
+		])
+		if (totalSupply === BigInt(0)) return BigInt(0)
+		const utilization = (totalBorrow * BigInt('1000000000000000000')) / totalSupply
+		const supplyRatePerSecond = await client.readContract({
+			address: evmCfg.poolAddress as Address,
+			abi: COMET_ABI,
+			functionName: 'getSupplyRate',
+			args: [utilization],
+		}) as bigint
+		const annualRateRay = supplyRatePerSecond * SECONDS_PER_YEAR * WAD_TO_RAY_MULTIPLIER
+		return annualRateRay
+	} catch {
+		if (evmCfg.manualAPRRay) return BigInt(evmCfg.manualAPRRay)
+		return BigInt(0)
+	}
+}
+
 /**
- * Simplified interface for Mastra agent to fetch yield data
- * This mimics calling the full CRE workflow orchestration
+ * Simplified interface for Mastra agent to fetch yield data.
+ * Uses viem publicClient instead of CRE EVMClient — works outside CRE workflow runtime.
  */
 export async function getYieldRecommendation(config: {
 	evms: EVMConfig[]
@@ -432,63 +487,57 @@ export async function getYieldRecommendation(config: {
 		humanConsensusChainName?: string
 	}
 }): Promise<YieldData> {
-	// Create a minimal runtime for logging
-	const runtime = {
-		log: (msg: string) => console.log(`[CRE Client] ${msg}`),
-		config,
-	} as Runtime<any>
+	const log = (msg: string) => console.log(`[CRE Client] ${msg}`)
 
-	// Build pools for all chains
-	const pools: Pool[] = []
 	const scoredPools: ScoredPool[] = []
 
 	for (const evmCfg of config.evms) {
-		runtime.log(
-			`Reading APY for protocol ${evmCfg.protocol} on chain ${evmCfg.chainName}`,
-		)
+		log(`Reading APY for protocol ${evmCfg.protocol} on chain ${evmCfg.chainName}`)
 
-		const evmClient = getEvmClientForChain(evmCfg)
-		const aprRay = readAPRRayForProtocol(runtime, evmCfg, evmClient)
+		let aprRay: bigint = BigInt(0)
+		try {
+			if (evmCfg.protocol === 'aave-v3') {
+				aprRay = await readAaveAPRRayViem(evmCfg)
+			} else if (evmCfg.protocol === 'compound-v3') {
+				aprRay = await readCompoundAPRRayViem(evmCfg)
+			} else if (evmCfg.manualAPRRay) {
+				aprRay = BigInt(evmCfg.manualAPRRay)
+			}
+		} catch (err) {
+			log(`APY read failed for ${evmCfg.protocol}/${evmCfg.chainName}: ${err instanceof Error ? err.message : String(err)}`)
+			if (evmCfg.manualAPRRay) aprRay = BigInt(evmCfg.manualAPRRay)
+		}
+
 		const apy = aprInRAYToAPY(aprRay)
-
 		const pool: Pool = {
 			chainName: evmCfg.chainName,
 			protocol: evmCfg.protocol,
 			APR: aprRay,
 			APY: apy,
 			protocolSmartWalletAddress: evmCfg.protocolSmartWalletAddress,
-			balance: BigInt(0), // Balance not needed for agent recommendations
+			balance: BigInt(0),
 		}
 
-		pools.push(pool)
+		// Use configured humanConsensusCount — on-chain read requires CRE runtime
+		const humanConsensusCount = evmCfg.humanConsensusCount ?? 0
 
-		// Read human consensus and score
-		const humanConsensusCount = readHumanConsensusCount(
-			runtime,
-			config.person1Contracts.humanConsensus,
-			config.person1Contracts.humanConsensusChainName || evmCfg.chainName,
-			evmCfg,
-		)
+		const consensusBoostBps = Math.round((humanConsensusCount / 100) * config.humanBoost.consensusWeightBpsPer100Humans)
+		const totalBoostBps = config.humanBoost.verifiedBoostBps + consensusBoostBps
+		const effectiveAPY = pool.APY + totalBoostBps / 10000
 
-		const scored = scorePoolForVerifiedHumans(
-			pool,
+		log(`Scored pool [${pool.chainName}/${pool.protocol}] baseAPY=${(pool.APY * 100).toFixed(4)}% effectiveAPY=${(effectiveAPY * 100).toFixed(4)}%`)
+
+		scoredPools.push({
+			...pool,
+			effectiveAPY,
+			verifiedBoostBps: config.humanBoost.verifiedBoostBps,
+			consensusBoostBps,
 			humanConsensusCount,
-			config.humanBoost.verifiedBoostBps,
-			config.humanBoost.consensusWeightBpsPer100Humans,
-			runtime,
-		)
-
-		scoredPools.push(scored)
+		})
 	}
 
-	// Find best pool
-	const bestPool = scoredPools.reduce((best, current) =>
-		current.effectiveAPY > best.effectiveAPY ? current : best
-	)
-
-	runtime.log(
-		`Best pool: ${bestPool.chainName}/${bestPool.protocol} with ${(bestPool.effectiveAPY * 100).toFixed(4)}% effective APY`,
-	)
+	const bestPool = scoredPools.reduce((best, c) => c.effectiveAPY > best.effectiveAPY ? c : best)
+	log(`Best pool: ${bestPool.chainName}/${bestPool.protocol} with ${(bestPool.effectiveAPY * 100).toFixed(4)}% effective APY`)
 
 	return {
 		bestPool: {
