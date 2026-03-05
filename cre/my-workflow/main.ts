@@ -137,96 +137,133 @@ const readCompoundAPRRay = (
 	evmClient: EVMClient,
 ): bigint => {
 	try {
-		const utilizationAbi = [
+		const cometAbi = [
 			{
 				type: 'function',
-				name: 'getUtilization',
+				name: 'totalSupply',
 				inputs: [],
-				outputs: [{ name: '', type: 'uint256' }],
+				outputs: [{ type: 'uint256' }],
+				stateMutability: 'view',
+			},
+			{
+				type: 'function',
+				name: 'totalBorrow',
+				inputs: [],
+				outputs: [{ type: 'uint256' }],
+				stateMutability: 'view',
+			},
+			{
+				type: 'function',
+				name: 'getSupplyRate',
+				inputs: [{ name: 'utilization', type: 'uint256' }],
+				outputs: [{ type: 'uint64' }],
 				stateMutability: 'view',
 			},
 		] as const
 
-		const utilizationCallData = encodeFunctionData({
-			abi: utilizationAbi,
-			functionName: 'getUtilization',
+		// ---------- totalSupply ----------
+		const supplyCall = encodeFunctionData({
+			abi: cometAbi,
+			functionName: 'totalSupply',
 		})
 
-		const utilizationResult = evmClient
+		const supplyResult = evmClient
 			.callContract(runtime, {
 				call: encodeCallMsg({
 					from: zeroAddress,
 					to: evmCfg.poolAddress as Address,
-					data: utilizationCallData,
+					data: supplyCall,
 				}),
 				blockNumber: LATEST_BLOCK_NUMBER,
 			})
 			.result()
 
-		const utilization = decodeFunctionResult({
-			abi: utilizationAbi,
-			functionName: 'getUtilization',
-			data: bytesToHex(utilizationResult.data),
+		const totalSupply = decodeFunctionResult({
+			abi: cometAbi,
+			functionName: 'totalSupply',
+			data: bytesToHex(supplyResult.data),
 		}) as bigint
 
-		const supplyRateAbi = [
-			{
-				type: 'function',
-				name: 'getSupplyRate',
-				inputs: [{ name: 'utilization', type: 'uint256' }],
-				outputs: [{ name: '', type: 'uint256' }],
-				stateMutability: 'view',
-			},
-		] as const
-
-		const supplyRateCallData = encodeFunctionData({
-			abi: supplyRateAbi,
-			functionName: 'getSupplyRate',
-			args: [utilization],
+		// ---------- totalBorrow ----------
+		const borrowCall = encodeFunctionData({
+			abi: cometAbi,
+			functionName: 'totalBorrow',
 		})
 
-		const supplyRateResult = evmClient
+		const borrowResult = evmClient
 			.callContract(runtime, {
 				call: encodeCallMsg({
 					from: zeroAddress,
 					to: evmCfg.poolAddress as Address,
-					data: supplyRateCallData,
+					data: borrowCall,
+				}),
+				blockNumber: LATEST_BLOCK_NUMBER,
+			})
+			.result()
+
+		const totalBorrow = decodeFunctionResult({
+			abi: cometAbi,
+			functionName: 'totalBorrow',
+			data: bytesToHex(borrowResult.data),
+		}) as bigint
+
+		if (totalSupply === BigInt(0)) {
+			runtime.log(`Compound pool empty, returning APR=0`)
+			return BigInt(0)
+		}
+
+		// utilization scaled to 1e18
+		const utilization = (totalBorrow * BigInt(1000000000000000000)) / totalSupply
+
+		// ---------- supplyRate ----------
+		const rateCall = encodeFunctionData({
+			abi: cometAbi,
+			functionName: 'getSupplyRate',
+			args: [utilization],
+		})
+
+		const rateResult = evmClient
+			.callContract(runtime, {
+				call: encodeCallMsg({
+					from: zeroAddress,
+					to: evmCfg.poolAddress as Address,
+					data: rateCall,
 				}),
 				blockNumber: LATEST_BLOCK_NUMBER,
 			})
 			.result()
 
 		const supplyRatePerSecondWad = decodeFunctionResult({
-			abi: supplyRateAbi,
+			abi: cometAbi,
 			functionName: 'getSupplyRate',
-			data: bytesToHex(supplyRateResult.data),
+			data: bytesToHex(rateResult.data),
 		}) as bigint
 
+		// convert to annual rate
 		const annualRateWad = supplyRatePerSecondWad * SECONDS_PER_YEAR
+
+		// convert WAD → RAY
 		const annualRateRay = annualRateWad * WAD_TO_RAY_MULTIPLIER
 
 		runtime.log(
-			`Compound rate [${evmCfg.chainName}] utilization=${utilization}, supplyRatePerSecondWad=${supplyRatePerSecondWad}, annualRateRay=${annualRateRay}`,
+			`Compound rate [${evmCfg.chainName}] totalSupply=${totalSupply} totalBorrow=${totalBorrow} utilization=${utilization} APR_RAY=${annualRateRay}`,
 		)
 
 		return annualRateRay
 	} catch (error) {
 		runtime.log(
-			`Compound adapter fallback [${evmCfg.chainName}] primary call failed: ${error instanceof Error ? error.message : String(error)}`,
+			`Compound adapter fallback [${evmCfg.chainName}] failed: ${
+				error instanceof Error ? error.message : String(error)
+			}`,
 		)
 
 		if (evmCfg.manualAPRRay) {
 			const aprRay = BigInt(evmCfg.manualAPRRay)
-			runtime.log(
-				`Compound adapter fallback [${evmCfg.chainName}] using manualAPRRay=${aprRay}`,
-			)
+			runtime.log(`Using manualAPRRay fallback=${aprRay}`)
 			return aprRay
 		}
 
-		runtime.log(
-			`Compound adapter fallback [${evmCfg.chainName}] using Aave-style reserve data read from pool`,
-		)
-		return readCurrentLiquidityRate(runtime, evmCfg, evmClient)
+		throw new Error(`Compound APR read failed`)
 	}
 }
 
@@ -267,30 +304,103 @@ const readBalanceInPool = (
 	evmCfg: EVMConfig,
 	evmClient: EVMClient,
 ): bigint => {
-	const callData = encodeFunctionData({
+	if (evmCfg.protocol === 'compound-v3') {
+		const abi = [
+			{
+				type: 'function',
+				name: 'balanceOf',
+				inputs: [{ name: 'account', type: 'address' }],
+				outputs: [{ name: '', type: 'uint256' }],
+				stateMutability: 'view',
+			},
+		] as const
+
+		const callData = encodeFunctionData({
+			abi,
+			functionName: 'balanceOf',
+			args: [evmCfg.protocolSmartWalletAddress as Hex],
+		})
+
+		const callResult = evmClient
+			.callContract(runtime, {
+				call: encodeCallMsg({
+					from: zeroAddress,
+					to: evmCfg.poolAddress as Address,
+					data: callData,
+				}),
+				blockNumber: LATEST_BLOCK_NUMBER,
+			})
+			.result()
+
+		const decoded = decodeFunctionResult({
+			abi,
+			functionName: 'balanceOf',
+			data: bytesToHex(callResult.data),
+		})
+
+		return decoded as bigint
+	}
+
+	// Aave V3 balance read - get aToken address first
+	const reserveCall = encodeFunctionData({
 		abi: MockPool,
-		functionName: 'balanceOf',
-		args: [evmCfg.protocolSmartWalletAddress as Hex, evmCfg.assetAddress as Hex],
+		functionName: 'getReserveData',
+		args: [evmCfg.assetAddress as Hex],
 	})
 
-	const callResult = evmClient
+	const reserveResult = evmClient
 		.callContract(runtime, {
 			call: encodeCallMsg({
 				from: zeroAddress,
 				to: evmCfg.poolAddress as Address,
-				data: callData,
+				data: reserveCall,
 			}),
-			blockNumber: LATEST_BLOCK_NUMBER, // warn: use finalized or safe in prod
+			blockNumber: LATEST_BLOCK_NUMBER,
 		})
 		.result()
 
-	const decoded = decodeFunctionResult({
+	const reserveData = decodeFunctionResult({
 		abi: MockPool,
-		functionName: 'balanceOf',
-		data: bytesToHex(callResult.data),
+		functionName: 'getReserveData',
+		data: bytesToHex(reserveResult.data),
 	})
 
-	return decoded as bigint
+	const aToken = reserveData.aTokenAddress
+
+	const erc20Abi = [
+		{
+			type: 'function',
+			name: 'balanceOf',
+			inputs: [{ name: 'account', type: 'address' }],
+			outputs: [{ name: '', type: 'uint256' }],
+			stateMutability: 'view',
+		},
+	] as const
+
+	const callData = encodeFunctionData({
+		abi: erc20Abi,
+		functionName: 'balanceOf',
+		args: [evmCfg.protocolSmartWalletAddress as Hex],
+	})
+
+	const balanceResult = evmClient
+		.callContract(runtime, {
+			call: encodeCallMsg({
+				from: zeroAddress,
+				to: aToken as Address,
+				data: callData,
+			}),
+			blockNumber: LATEST_BLOCK_NUMBER,
+		})
+		.result()
+
+	const balance = decodeFunctionResult({
+		abi: erc20Abi,
+		functionName: 'balanceOf',
+		data: bytesToHex(balanceResult.data),
+	})
+
+	return balance as bigint
 }
 
 const buildPoolForChain = (

@@ -15,23 +15,22 @@
   "evms": [
     {
       "protocol": "aave-v3",
-      "assetAddress": "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05",
-      "poolAddress": "0xBBccb575c318C786E6129d9F8C6C71F0Aea4dF06",
+      "assetAddress": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+      "poolAddress": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
       "protocolSmartWalletAddress": "0xA08c284a0Ade4867cbdcf8090245FD520F8778c6",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000",
-      "humanPoolId": "aave-arbitrum",
+      "humanPoolId": "aave-sepolia-usdc",
       "humanConsensusCount": 847
     },
     {
       "protocol": "compound-v3",
-      "assetAddress": "0x88A2d74F47a237a62e7A51cdDa67270CE381555e",
-      "poolAddress": "0xecb405a1b8e78Bf84419cD007E833C61F77Cc54F",
+      "assetAddress": "0x036CbD53842c5426634e7929541ec2318F3dCf7e",
+      "poolAddress": "0x61490650AbaA31393464C3f34E8B29cd1C44118E",
       "protocolSmartWalletAddress": "0x11e32bc5BDAD3ecD98c7217CF3B88dA9a0Ff2D7A",
       "chainName": "ethereum-testnet-sepolia-base-1",
       "gasLimit": "1000000",
-      "manualAPRRay": "45000000000000000000000000",
-      "humanPoolId": "compound-base",
+      "humanPoolId": "compound-base-sepolia-usdc",
       "humanConsensusCount": 412
     }
   ]
